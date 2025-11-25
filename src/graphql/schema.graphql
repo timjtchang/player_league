@@ -1,0 +1,91 @@
+type Query {
+  player(pid: ID!): Player
+
+  players(is_active: Boolean, q: String): [Player]!
+
+  match(mid: ID!): Match
+
+  matches(is_active: Boolean): [Match]!
+
+  dashboard: Dashboard
+}
+
+type Mutation {
+  matchAward(mid: ID!, pid: ID!, points: Int!): Match
+
+  matchCreate(
+    p1_id: ID!
+    p2_id: ID!
+    entry_fee_usd_cents: Int!
+    prize_usd_cents: Int!
+  ): Match
+
+  matchDisqualify(mid: ID!, pid: ID!): Match
+
+  matchEnd(mid: ID!): Match
+
+  playerCreate(playerInput: PlayerCreateInput): Player
+
+  playerDelete(pid: ID!): Boolean
+
+  playerDeposit(pid: ID!, amount_usd_cents: Int!): Player
+
+  playerUpdate(pid: ID!, playerInput: PlayerUpdateInput): Player
+}
+
+enum HandedEnum {
+  ambi
+  left
+  right
+}
+
+input PlayerCreateInput {
+  fname: String!
+  handed: HandedEnum
+  initial_balance_usd_cents: Int!
+  lname: String
+}
+
+input PlayerUpdateInput {
+  is_active: Boolean
+  lname: String
+}
+
+type Player {
+  pid: ID!
+  name: String!
+  handed: HandedEnum
+  is_active: Boolean
+  in_active_match: Match
+  balance_usd_cents: Int
+  num_join: Int
+  num_won: Int
+  efficiency: Float
+  total_prize_usd_cents: Int
+}
+
+type Match {
+  age: Int
+  ended_at: String
+  entry_fee_usd_cents: Int
+  is_active: Boolean
+  is_dq: Boolean
+  mid: ID!
+  p1: Player!
+  p1_points: Int
+  p2: Player!
+  p2_points: Int
+  prize_usd_cents: Int
+  winner: Player
+}
+
+type Dashboard {
+  player: DashboardPlayer
+}
+
+type DashboardPlayer {
+  avg_balance_usd_cents: Int
+  num_active: Int
+  num_inactive: Int
+  num_total: Int
+}
