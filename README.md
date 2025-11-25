@@ -10,6 +10,30 @@ A GraphQL-based API for managing a player league, handling players, matches, and
 - **Database:** MongoDB
 - **Containerization:** Docker & Docker Compose
 
+## Project Structure
+
+```text
+player_league/
+├── config/
+│   └── mongo.json          # Database configuration
+├── src/
+│   ├── db/
+│   │   └── MongoWrapper.js # MongoDB connection and wrapper
+│   ├── graphql/
+│   │   ├── resolvers.js    # GraphQL resolvers
+│   │   └── schema.graphql  # GraphQL type definitions
+│   ├── services/
+│   │   ├── MatchService.js # Business logic for matches
+│   │   └── PlayerService.js# Business logic for players
+│   └── server.js           # Application entry point
+├── .gitignore
+├── docker-compose.yml      # Docker services configuration
+├── index.js                # Legacy entry point (deprecated)
+├── package.json
+├── package-lock.json
+└── README.md
+```
+
 ## Functionality
 
 ### Player Handling
@@ -82,6 +106,7 @@ A GraphQL-based API for managing a player league, handling players, matches, and
     ```bash
     npm start
     ```
+    *Note: This runs `src/server.js`.*
 
 5.  **Access the API:**
     The GraphQL Playground is available at:
@@ -107,8 +132,8 @@ query {
 ```graphql
 mutation {
   matchCreate(
-    pid1: "PLAYER_1_ID"
-    pid2: "PLAYER_2_ID"
+    p1_id: "PLAYER_1_ID"
+    p2_id: "PLAYER_2_ID"
     entry_fee_usd_cents: 100
     prize_usd_cents: 200
   ) {
@@ -117,67 +142,3 @@ mutation {
   }
 }
 ```
-
-db:{
-
-player:
-
-pid: ID!
-created_at:
-fname: String
-lname: String
-handed: HandedEnum
-is_active: Boolean
-in_active_match: Match
-balance_usd_cents: Int
-num_join: Int
-num_won: Int
-total_prize_usd_cents: Int
-
-match:
-mid: ID!
-created_at:
-is_active: Boolean
-ended_at: String
-entry_fee_usd_cents: Int
-p1_id: String!
-p1_name: String!
-p1_points:INT!
-p2_id: String!
-p2_name: String!
-p2_points:INT!
-prize_usd_cents: Int
-winner_id: String
-winner_name: String
-
-}
-
-graphql{
-
-player:
-
-pid: ID!
-name: String!
-handed: HandedEnum
-is_active: Boolean
-in_active_match: Match
-balance_usd_cents: Int
-num_join: Int
-num_won: Int
-efficiency: Float
-total_prize_usd_cents: Int
-
-match:
-mid: ID!
-is_active: Boolean
-age: Int
-ended_at: String
-entry_fee_usd_cents: Int
-p1: Player!
-p2: Player!
-p1_points:INT
-p2_points:INT
-prize_usd_cents: Int
-winner: Player
-
-}
