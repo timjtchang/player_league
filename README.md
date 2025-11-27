@@ -10,6 +10,10 @@ A GraphQL-based API for managing a player league, handling players, matches, and
 - **Database:** MongoDB
 - **Containerization:** Docker & Docker Compose
 
+## Demo
+
+![Demo](demo/demo.gif)
+
 ## Project Structure
 
 ```text
