@@ -50,6 +50,14 @@ class MatchService {
 
     this.activeMatchIDs.add(mid.toString());
 
+    await this._mgdb.updatePlayer(data.p1_id, {
+      num_join: p1.num_join ? 1 : p1.num_join + 1,
+    });
+
+    await this._mgdb.updatePlayer(data.p2_id, {
+      num_join: p2.num_join ? 1 : p2.num_join + 1,
+    });
+
     return match;
   }
 
@@ -57,9 +65,16 @@ class MatchService {
    * READ OPERATIONS
    */
   async getMatchById(mid) {
-    const matchArr = await this._mgdb.getMatch(mid);
-    if (!matchArr || matchArr.length === 0) return null;
-    return matchArr[0];
+    const match = await this._mgdb.getMatch(mid);
+
+    if (!match || match.length === 0) return null;
+
+    return Array.isArray(match) ? match[0] : match;
+  }
+
+  async getAllMatches() {
+    const matchArr = await this._mgdb.getAllMatches();
+    return matchArr;
   }
 
   async getActiveMatchArray() {
@@ -100,28 +115,47 @@ class MatchService {
   }
 
   async endMatch(mid) {
-    if (!this.IsMatchActive(mid)) return { status: "notactive" };
+    //if (!this.IsMatchActive(mid)) return { status: "notactive" };
 
     const match = await this.getMatchById(mid);
     if (!match) return { status: "notexist" };
 
-    if (match.p1_points === match.p2_points) return { status: "tied" };
-
-    const winner_pid =
-      match.p1_points > match.p2_points ? match.p1_id : match.p2_id;
-
-    await this._mgdb.updateMatch(mid, { ended_at: new Date() });
-
     this.deleteActiveMatch(mid);
 
-    return {
-      status: "success",
-      match: match,
-      winner_pid: winner_pid,
-      prize_usd_cents: match.prize_usd_cents,
-      p1_id: match.p1_id,
-      p2_id: match.p2_id,
-    };
+    if (match.p1_points === match.p2_points) {
+      await this._mgdb.updateMatch(mid, {
+        ended_at: new Date(),
+        winner_pid: null,
+      });
+
+      return {
+        status: "tied",
+        match: match,
+        winner_pid: null,
+        prize_usd_cents: match.prize_usd_cents,
+        p1_id: match.p1_id,
+        p2_id: match.p2_id,
+      };
+    } else {
+      const winner_pid =
+        match.p1_points > match.p2_points ? match.p1_id : match.p2_id;
+
+      await this._mgdb.updateMatch(mid, {
+        ended_at: new Date(),
+        winner_pid: winner_pid,
+      });
+
+      this.deleteActiveMatch(mid);
+
+      return {
+        status: "success",
+        match: match,
+        winner_pid: winner_pid,
+        prize_usd_cents: match.prize_usd_cents,
+        p1_id: match.p1_id,
+        p2_id: match.p2_id,
+      };
+    }
   }
 
   /**

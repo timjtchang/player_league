@@ -42,11 +42,10 @@ async function decorate_match_graphQL(match) {
   const p2 = await ps.getPlayer(match.p2_id);
   const active = ms.IsMatchActive(match._id);
 
-  let winner_pid = null;
-  if (!active) {
-    if (match.p1_points > match.p2_points) winner_pid = match.p1_id;
-    else if (match.p2_points > match.p1_points) winner_pid = match.p2_id;
-  }
+  let winner = null;
+
+  if (match.winner_pid && match.winner_pid == p1._id) winner = p1;
+  else if (match.winner_pid && match.winner_pid == p2._id) winner = p2;
 
   return {
     mid: match._id.toString(),
@@ -58,29 +57,34 @@ async function decorate_match_graphQL(match) {
     entry_fee_usd_cents: match.entry_fee_usd_cents,
     p1_id: match.p1_id,
     p1_name: p1 ? `${p1.fname} ${p1.lname}` : "Unknown",
-    p1: decorate_player_graphQL(p1),
+    p1: await decorate_player_graphQL(p1),
     p1_points: match.p1_points,
     p2_id: match.p2_id,
-    p2: decorate_player_graphQL(p2),
+    p2: await decorate_player_graphQL(p2),
     p2_name: p2 ? `${p2.fname} ${p2.lname}` : "Unknown",
     p2_points: match.p2_points,
     prize_usd_cents: match.prize_usd_cents,
-    winner_pid: winner_pid,
+    winner_pid: winner ? winner._id : null,
+    winner: winner ? await decorate_player_graphQL(winner) : null,
   };
 }
 
-function decorate_player_graphQL(player) {
+async function decorate_player_graphQL(player) {
+  if (player === null) {
+    return {};
+  }
   let efficiency = player.num_join > 0 ? player.num_won / player.num_join : 0;
 
   const handMap = { L: "left", R: "right", A: "ambi" };
+
+  const mid = ps.getInActiveMatchByPlayer(player._id.toString());
 
   return {
     pid: player._id.toString(),
     name: player.lname ? `${player.fname} ${player.lname}` : player.fname,
     handed: handMap[player.handed] || "undefined",
     is_active: player.is_active,
-    in_active_match:
-      ps.getInActiveMatchByPlayer(player._id.toString()) !== null,
+    in_active_match: mid,
     balance_usd_cents: player.balance_usd_cents,
     num_join: player.num_join,
     num_won: player.num_won,
@@ -97,14 +101,16 @@ const resolvers = {
     player: async (_, { pid }) => {
       let player = await ps.getPlayer(pid);
       if (!player) return null;
-      return decorate_player_graphQL(player);
+      return await decorate_player_graphQL(player);
     },
 
     players: async (_, { is_active, q }) => {
       const activeStr = is_active !== undefined ? String(is_active) : "*";
       const players = await ps.getPlayers(activeStr);
 
-      let allPlayers = players.map((p) => decorate_player_graphQL(p));
+      const allPlayers = await Promise.all(
+        players.map(async (p) => await decorate_player_graphQL(p))
+      );
 
       if (!q) return allPlayers;
 
@@ -119,8 +125,13 @@ const resolvers = {
     },
 
     matches: async (_, { is_active }) => {
-      const matches = await ms.getActiveMatchArray();
-      return await Promise.all(matches.map((m) => decorate_match_graphQL(m)));
+      if (is_active) {
+        const matches = await ms.getActiveMatchArray();
+        return await Promise.all(matches.map((m) => decorate_match_graphQL(m)));
+      } else {
+        const matches = await ms.getAllMatches();
+        return await Promise.all(matches.map((m) => decorate_match_graphQL(m)));
+      }
     },
 
     dashboard: async () => {
@@ -151,23 +162,23 @@ const resolvers = {
     /**
      * POST POINTS
      */
-    matchAward: async (obj, input) => {
-      let { mid, pid, points } = input;
+    // matchAward: async (obj, input) => {
+    //   let { mid, pid, points } = input;
 
-      if (!points || points <= 0 || isNaN(Number(points)))
-        throw new GraphQLError("Invalid points value");
+    //   if (!points || points <= 0 || isNaN(Number(points)))
+    //     throw new GraphQLError("Invalid points value");
 
-      points = Number(points);
-      let status = await ms.postPoints(mid, pid, points);
+    //   points = Number(points);
+    //   let status = await ms.postPoints(mid, pid, points);
 
-      if (status === "notactive") throw new GraphQLError("Match not active");
-      else if (status === "notexist")
-        throw new GraphQLError("Match does not exist");
-      else if (status === "success") {
-        let match = await ms.getMatchById(mid);
-        return await decorate_match_graphQL(match);
-      } else throw new GraphQLError("Unknown error");
-    },
+    //   if (status === "notactive") throw new GraphQLError("Match not active");
+    //   else if (status === "notexist")
+    //     throw new GraphQLError("Match does not exist");
+    //   else if (status === "success") {
+    //     let match = await ms.getMatchById(mid);
+    //     return await decorate_match_graphQL(match);
+    //   } else throw new GraphQLError("Unknown error");
+    // },
 
     /**
      * CREATE MATCH (Orchestrator)
@@ -198,9 +209,11 @@ const resolvers = {
 
       await ps.updatePlayer(input.p1_id, {
         balance_usd_cents: p1.balance_usd_cents - input.entry_fee_usd_cents,
+        num_join: p1.num_join + 1,
       });
       await ps.updatePlayer(input.p2_id, {
         balance_usd_cents: p2.balance_usd_cents - input.entry_fee_usd_cents,
+        num_join: p2.num_join + 1,
       });
 
       await ps.setPlayerInActiveMatch(input.p1_id, match._id.toString());
@@ -217,9 +230,13 @@ const resolvers = {
 
       let result = await ms.endMatch(mid);
 
-      if (result.status === "notexist") return null;
-      if (result.status === "notactive" || result.status === "tied")
-        return null;
+      if (result.status === "notexist" || result.status === "notactive")
+        throw new GraphQLError(result.status);
+      else if (result.status === "tied") {
+        ps.clearPlayerFromMatch(result.p1_id);
+        ps.clearPlayerFromMatch(result.p2_id);
+        return await decorate_match_graphQL(result.match);
+      }
 
       if (result.status === "success") {
         await ps.payWinner(result.winner_pid, result.prize_usd_cents);
@@ -231,17 +248,13 @@ const resolvers = {
 
         let p1 = await ps.getPlayer(result.p1_id);
         let p2 = await ps.getPlayer(result.p2_id);
-        await ps.updatePlayer(result.p1_id, {
-          num_join: (p1.num_join || 0) + 1,
-        });
-        await ps.updatePlayer(result.p2_id, {
-          num_join: (p2.num_join || 0) + 1,
-        });
 
         ps.clearPlayerFromMatch(result.p1_id);
         ps.clearPlayerFromMatch(result.p2_id);
 
-        return await decorate_match_graphQL(result.match);
+        const match = await ms.getMatchById(mid);
+
+        return await decorate_match_graphQL(match);
       }
       return null;
     },
@@ -251,12 +264,13 @@ const resolvers = {
      */
     playerCreate: async (obj, { playerInput }) => {
       let err_msg = queryHelper(playerInput);
+      console.log(err_msg);
 
       if (err_msg !== "") return null;
 
       let id = await ps.createPlayer(playerInput);
       let player = await ps.getPlayer(id);
-      return decorate_player_graphQL(player);
+      return await decorate_player_graphQL(player);
     },
 
     playerDelete: async (obj, input) => {
@@ -278,7 +292,7 @@ const resolvers = {
       });
 
       let player = await ps.getPlayer(pid);
-      return decorate_player_graphQL(player);
+      return await decorate_player_graphQL(player);
     },
 
     playerUpdate: async (obj, req) => {
@@ -286,7 +300,17 @@ const resolvers = {
       let status = await ps.updatePlayer(pid, playerInput);
       if (!status) return null;
 
-      return decorate_player_graphQL(status);
+      return await decorate_player_graphQL(status);
+    },
+
+    postPoints: async (obj, input) => {
+      let { mid, pid, amount } = input;
+      let res = await ms.postPoints(mid, pid, amount);
+
+      if (res === "success") {
+        const match = await ms.getMatchById(mid);
+        return decorate_match_graphQL(match);
+      } else return {};
     },
   },
 };

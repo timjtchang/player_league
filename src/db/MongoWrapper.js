@@ -57,13 +57,33 @@ class MongoWrapper {
 
   async updatePlayer(id, data) {
     const filter = { _id: new ObjectId(id) };
-    const update = {
-      $set: {
-        is_active: data.is_active,
-        lname: data.lname,
-        balance_usd_cents: parseInt(data.balance_usd_cents),
-      },
-    };
+
+    const setFields = {};
+
+    if (data.is_active !== undefined) {
+      setFields.is_active = data.is_active;
+    }
+
+    if (data.lname !== undefined) {
+      setFields.lname = data.lname;
+    }
+
+    if (data.balance_usd_cents !== undefined) {
+      setFields.balance_usd_cents = parseInt(data.balance_usd_cents);
+    }
+
+    if (data.num_won !== undefined) {
+      setFields.num_won = data.num_won;
+    }
+
+    if (data.num_join !== undefined) {
+      setFields.num_join = data.num_join;
+    }
+
+    if (Object.keys(setFields).length === 0) {
+      return null;
+    }
+    const update = { $set: setFields };
     return await this._collection.updateOne(filter, update);
   }
 
@@ -89,6 +109,21 @@ class MongoWrapper {
 
   async deleteMatch(id) {
     return await this._collectionMatch.deleteOne({ _id: new ObjectId(id) });
+  }
+
+  async getMatch(id) {
+    if (!id) return null;
+    const match = await this._collectionMatch.findOne({
+      _id: new ObjectId(id),
+    });
+    if (match) match._id = match._id.toString();
+    return match;
+  }
+
+  async getAllMatches(activeOnly = false) {
+    const query = activeOnly ? { is_active: true } : {};
+    let data = await this._collectionMatch.find(query).toArray();
+    return data.map((p) => ({ ...p, _id: p._id.toString() }));
   }
 }
 

@@ -11,8 +11,6 @@ type Query {
 }
 
 type Mutation {
-  matchAward(mid: ID!, pid: ID!, points: Int!): Match
-
   matchCreate(
     p1_id: ID!
     p2_id: ID!
@@ -31,6 +29,8 @@ type Mutation {
   playerDeposit(pid: ID!, amount_usd_cents: Int!): Player
 
   playerUpdate(pid: ID!, playerInput: PlayerUpdateInput): Player
+
+  postPoints(mid: ID!, pid: ID!, amount: Int!): Match
 }
 
 enum HandedEnum {
@@ -52,11 +52,11 @@ input PlayerUpdateInput {
 }
 
 type Player {
-  pid: ID!
-  name: String!
+  pid: ID
+  name: String
   handed: HandedEnum
   is_active: Boolean
-  in_active_match: Match
+  in_active_match: String
   balance_usd_cents: Int
   num_join: Int
   num_won: Int
