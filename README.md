@@ -106,13 +106,44 @@ player_league/
     ```bash
     npm start
     ```
-    *Note: This runs `src/server.js`.*
+
+    _Note: This runs `src/server.js`._
 
 5.  **Access the API:**
     The GraphQL Playground is available at:
     [http://localhost:3000/graphql](http://localhost:3000/graphql)
 
 ## Example Queries
+
+### create player
+
+```graphql
+mutation {
+  playerCreate(
+    playerInput: {
+      fname: "Tony"
+      lname: "Luo"
+      initial_balance_usd_cents: 100
+      handed: right
+    }
+  ) {
+    name
+    pid
+  }
+}
+```
+
+### deposit
+
+```graphql
+mutation {
+  playerDeposit(pid: "69256f07382b9f17d1a94ae6", amount_usd_cents: 100) {
+    pid
+    name
+    balance_usd_cents
+  }
+}
+```
 
 ### Get All Players
 
@@ -121,8 +152,11 @@ query {
   players {
     pid
     name
-    balance_usd_cents
+    num_join
+    num_won
+    in_active_match
     efficiency
+    balance_usd_cents
   }
 }
 ```
@@ -132,13 +166,100 @@ query {
 ```graphql
 mutation {
   matchCreate(
-    p1_id: "PLAYER_1_ID"
-    p2_id: "PLAYER_2_ID"
-    entry_fee_usd_cents: 100
-    prize_usd_cents: 200
+    p1_id: "69256f07382b9f17d1a94ae6"
+    p2_id: "69256f0a382b9f17d1a94ae7"
+    entry_fee_usd_cents: 50
+    prize_usd_cents: 100
+  ) {
+    age
+    ended_at
+    entry_fee_usd_cents
+    is_active
+    mid
+    p1 {
+      name
+      pid
+    }
+    p2 {
+      name
+      pid
+    }
+    p1_points
+    p2_points
+    prize_usd_cents
+    winner {
+      name
+    }
+  }
+}
+```
+
+### Post points
+
+```graphql
+mutation {
+  postPoints(
+    mid: "692802bb8d2ae9ec4d439d9f"
+    pid: "69256f0a382b9f17d1a94ae7"
+    amount: 100
   ) {
     mid
+  }
+}
+```
+
+### Get Matches
+
+```graphql
+query {
+  matches(is_active: true) {
+    age
+    ended_at
+    entry_fee_usd_cents
     is_active
+    mid
+    p1 {
+      name
+      pid
+    }
+    p2 {
+      name
+      pid
+    }
+    p1_points
+    p2_points
+    prize_usd_cents
+    winner {
+      name
+    }
+  }
+}
+```
+
+### End Match
+
+```graphql
+mutation {
+  matchEnd(mid: "692802bb8d2ae9ec4d439d9f") {
+    age
+    ended_at
+    entry_fee_usd_cents
+    is_active
+    mid
+    p1 {
+      name
+      pid
+    }
+    p2 {
+      name
+      pid
+    }
+    p1_points
+    p2_points
+    prize_usd_cents
+    winner {
+      name
+    }
   }
 }
 ```
